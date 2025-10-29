@@ -1,5 +1,3 @@
-open Ast
-
 (** [parse s] parses [s] into an AST. *)
 let parse (s : string) : expr =
   let lexbuf = Lexing.from_string s in
@@ -56,4 +54,4 @@ let rec eval (e : expr) : expr =
 (** [interp s] interprets [s] by lexing and parsing,
     evaluating, and converting the result to string. *)
 let interp (s : string) : expr =
-  s |> parse |> eval 
+  s |> parse |> eval |> string_of_val
