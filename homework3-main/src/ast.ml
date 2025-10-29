@@ -1,12 +1,12 @@
-type bop = 
-  | Add
-  | Mult
+type bop =
+  | Plus
+  | Times
   | Leq
 
-type expr = 
+type expr =
   | Int of int
   | Bool of bool
-  | Binop of bop * expr * expr
   | Var of string
+  | Binop of bop * expr * expr
   | Let of string * expr * expr
   | If of expr * expr * expr
