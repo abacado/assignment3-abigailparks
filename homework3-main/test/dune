@@ -1,4 +1,3 @@
-(test
+(executable
  (name main)
- (modules main)
- (libraries calcpl ounit2))
+ (libraries interp ounit2))
