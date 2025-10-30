@@ -4,8 +4,7 @@
 
 %token <int> INT
 %token <string> ID
-%token TRUE
-%token FALSE
+%token TRUE FALSE
 %token PLUS TIMES
 %token LEQ
 %token LET EQUALS IN
