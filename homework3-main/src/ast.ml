@@ -1,7 +1,7 @@
 type bop =
   | Plus
   | Times
-  | Leq
+  | Leq  (* <= operator *)
 
 type expr =
   | Int of int

@@ -1,81 +1,62 @@
 open Ast
 
-(** [parse s] parses [s] into an AST. *)
-let parse (s : string) : expr =
-  let lexbuf = Lexing.from_string s in
-  let ast = Parser.prog Lexer.read lexbuf in
-  ast
+(* Public error strings *)
+let bop_err = "invalid binary operation"
+let if_guard_err = "invalid if guard"
+let unbound_var_err = "unbound variable"
 
-(** The error message produced if a variable is unbound. *)
-let unbound_var_err = "Unbound variable"
-
-(** The error message produced if binary operators and their
-    operands do not have the correct types. *)
-let bop_err = "Operator and operand type mismatch"
-
-(** The error message produced if the guard
-    of an [if] does not have type [bool]. *)
-let if_guard_err = "Guard of if must have type bool"
-
-(** [string_of_val v] converts a value [v] to a string. 
-    Requires: [v] is a value. *)
-let string_of_val (v : expr) : string =
-  match v with
+let string_of_val (e : expr) : string =
+  match e with
   | Int i -> string_of_int i
   | Bool b -> string_of_bool b
   | _ -> failwith "precondition violated"
 
-(** [is_value e] is whether [e] is a value. *)
-let is_value : expr -> bool = function
-  | Int _ -> true
-  | Bool _ -> true
+let is_value = function
+  | Int _ | Bool _ -> true
   | _ -> false
 
-(** [subst x v e] is [e] with all free occurrences of [x] replaced by [v]. *)
-let rec subst (x : string) (v : expr) (e : expr) : expr =
+(* Substitution for let semantics *)
+let rec subst (e : expr) (v : expr) (x : string) : expr =
   match e with
-  | Int _ | Bool _ -> e
   | Var y -> if x = y then v else e
-  | Binop (b, e1, e2) -> Binop (b, subst x v e1, subst x v e2)
+  | Int _ | Bool _ -> e
+  | Binop (b, e1, e2) -> Binop (b, subst e1 v x, subst e2 v x)
   | Let (y, e1, e2) ->
-      let e1' = subst x v e1 in
-      if x = y then Let (y, e1', e2) else Let (y, e1', subst x v e2)
-  | If (e1, e2, e3) -> If (subst x v e1, subst x v e2, subst x v e3)
+      let e1' = subst e1 v x in
+      if x = y then Let (y, e1', e2)
+      else Let (y, e1', subst e2 v x)
+  | If (e1, e2, e3) -> If (subst e1 v x, subst e2 v x, subst e3 v x)
 
-(** [step e] takes a single step of evaluation of [e]. *)
+(* Binary operation step helper *)
+and step_bop (b : bop) (e1 : expr) (e2 : expr) : expr =
+  match b, e1, e2 with
+  | Plus,  Int a, Int b -> Int (a + b)
+  | Times, Int a, Int b -> Int (a * b)
+  | Leq,   Int a, Int b -> Bool (a <= b)
+  | _ -> failwith bop_err
+
+(* One small-step evaluation *)
 let rec step (e : expr) : expr =
   match e with
   | Int _ | Bool _ -> failwith "Does not step"
-  | Binop (bop, e1, e2) when is_value e1 && is_value e2 ->
-      step_bop bop e1 e2
-  | Binop (bop, e1, e2) when is_value e1 ->
-      Binop (bop, e1, step e2)
-  | Binop (bop, e1, e2) ->
-      Binop (bop, step e1, e2)
+  | Var _ -> failwith unbound_var_err
+  | Binop (b, e1, e2) ->
+      if not (is_value e1) then Binop (b, step e1, e2)
+      else if not (is_value e2) then Binop (b, e1, step e2)
+      else step_bop b e1 e2
+  | Let (x, e1, e2) when is_value e1 -> subst e2 e1 x
+  | Let (x, e1, e2) -> Let (x, step e1, e2)
   | If (Bool true, e2, _) -> e2
   | If (Bool false, _, e3) -> e3
+  | If (Int _, _, _) -> failwith if_guard_err
   | If (e1, e2, e3) -> If (step e1, e2, e3)
-  | Let (x, v1, e2) when is_value v1 ->
-      subst x v1 e2
-  | Let (x, e1, e2) ->
-      Let (x, step e1, e2)
-  | Var _ -> failwith unbound_var_err
 
-(** [step_bop bop v1 v2] implements the primitive operation
-    [v1 bop v2]. Requires: [v1] and [v2] are both values. *)
-and step_bop bop e1 e2 =
-  match bop, e1, e2 with
-  | Add, Int a, Int b -> Int (a + b)
-  | Mult, Int a, Int b -> Int (a * b)
-  | Leq, Int a, Int b -> Bool (a <= b)
-  | _ -> failwith bop_err
-
-(** [eval e] fully evaluates [e] to a value [v]. *)
 let rec eval (e : expr) : expr =
-  if is_value e then e
-  else e |> step |> eval
+  if is_value e then e else eval (step e)
 
-(** [interp s] interprets [s] by lexing, parsing, evaluating,
-    and converting the result to string. *)
-let interp (s : string) : string =
-  s |> parse |> eval |> string_of_val
+let parse (s : string) : expr =
+  let lb = Lexing.from_string s in
+  Parser.main Lexer.read lb
+
+let run (s : string) : string =
+  string_of_val (eval (parse s))

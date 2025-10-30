@@ -1,7 +1,6 @@
+(ocamllex (modules lexer))
+(menhir (modules parser))
+
 (library
- (name interp))
-
-(menhir
- (modules parser))
-
-(ocamllex lexer)
+ (name calcpl)
+ (modules ast lexer parser main))
